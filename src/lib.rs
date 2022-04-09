@@ -52,9 +52,25 @@ pub fn run<R: std::io::Read, W: std::io::Write>(reader: R, writer: &mut W) -> Re
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
     #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+    fn spec_example() {
+        let input = "type,client,tx,amount
+deposit,1,1,1.0
+deposit,2,2,2.0
+deposit,1,3,2.0
+withdrawal,1,4,1.5
+withdrawal,2,5,3.0
+";
+        let expected = "client,available,held,total,locked
+1,1.5,0.0,1.5,false
+2,2.0,0.0,2.0,false
+";
+        let mut actual = Vec::new();
+        run(input.as_bytes(), &mut actual).unwrap();
+        let actual = String::from_utf8(actual).unwrap();
+        assert_eq!(actual, expected);
     }
 }

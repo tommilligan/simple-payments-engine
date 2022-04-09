@@ -112,6 +112,9 @@ Big list of assumptions I made:
 - There were no negative `amount` values in the data. I assumed that such a action is invalid (a negative withdrawal should be a deposit, and vv).
   - Amounts will be in the range `0 <= amount <= 1E11` (see precision above).
 - Assumed it was fine to create clients and output their state, even if all actions failed (e.g. one `withdrawal` for a client, results in that client appearing in the ouput with funds of `0`).
+- Assumed that we desire consistency in the results - i.e. they should be sorted.
+  - I chose to back the underlying store with an `IndexMap`, rather than sorting a lot of data at output time.
+    In practice these rows would be in a database, and you'd just have an index on the id.
 
 ## Scaling
 

@@ -1,5 +1,4 @@
 use crate::types::TransferId;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 // Make sure this is small, we need to store one per transfer.
@@ -17,4 +16,4 @@ pub struct State {
     pub status: Status,
 }
 
-pub type Store = HashMap<TransferId, State>;
+pub type Store = std::collections::HashMap<TransferId, State>;
