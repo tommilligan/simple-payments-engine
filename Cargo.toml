@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.56"
 thiserror = "1.0.30"
+serde = { version = "1.0.136", features = ["derive"] }
+csv = "1.1.6"
+env_logger = "0.9.0"
+log = "0.4.16"
 
 [dev-dependencies]
-csv = "1.1.6"
 pretty_assertions = "1.2.1"
-serde = "1.0.136"

@@ -1,7 +1,7 @@
 use crate::types::ClientId;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 // Make sure this is small, we need to store one per client.
 #[repr(u8)]
 pub enum Access {

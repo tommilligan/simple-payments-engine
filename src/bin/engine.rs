@@ -1,9 +1,13 @@
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
-use simple_payments_engine::{csv::InputRow, store::Store, types::action::Action};
+use simple_payments_engine::{
+    csv::{InputRow, OutputRow},
+    store::{client::Access, Store},
+    types::action::Action,
+};
 use std::env::args;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{stdout, BufReader};
 
 fn run() -> Result<()> {
     let args: Vec<String> = args().collect();
@@ -15,6 +19,7 @@ fn run() -> Result<()> {
     let input_reader = BufReader::new(File::open(input_filepath)?);
     let mut csv_reader = csv::Reader::from_reader(input_reader);
 
+    // Read in all the events and apply them
     let mut store = Store::default();
     for (index, result) in csv_reader.deserialize().into_iter().enumerate() {
         let row: InputRow = result?;
@@ -29,6 +34,21 @@ fn run() -> Result<()> {
             warn!("Action {index} not applied: {error}");
         }
     }
+
+    // Return output
+    let clients = store.into_client_store();
+    let stdout = stdout();
+    let mut writer = csv::Writer::from_writer(stdout);
+    for (client_id, client_state) in clients.into_iter() {
+        writer.serialize(OutputRow {
+            client: client_id.0,
+            available: client_state.available(),
+            held: client_state.held,
+            total: client_state.total,
+            locked: client_state.access == Access::Frozen,
+        })?;
+    }
+
     Ok(())
 }
 

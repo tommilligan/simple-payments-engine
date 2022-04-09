@@ -13,6 +13,10 @@ pub struct Store {
 }
 
 impl Store {
+    pub fn into_client_store(self) -> client::Store {
+        self.client
+    }
+
     pub fn apply(&mut self, action: action::Action) -> Result<(), Error> {
         let action::Action {
             client_id,
