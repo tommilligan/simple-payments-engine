@@ -106,6 +106,10 @@ impl Store {
                         ),
                     });
                 };
+                // Here, we assume the client id on the action is correct.
+                // I would very much not trust this in production code, and
+                // would store the client id of the original transfer, and
+                // check it here before taking action.
                 match payload.action {
                     action::SettleAction::Resolve => {
                         transfer.status = transfer::Status::Transferred;
