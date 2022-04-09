@@ -13,7 +13,9 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("csv error")]
-    CsvError(#[from] ::csv::Error),
+    Csv(#[from] ::csv::Error),
+    #[error("io error")]
+    Io(#[from] std::io::Error),
 }
 
 pub fn run<R: std::io::Read, W: std::io::Write>(reader: R, writer: &mut W) -> Result<(), Error> {
@@ -23,7 +25,19 @@ pub fn run<R: std::io::Read, W: std::io::Write>(reader: R, writer: &mut W) -> Re
     // Read in all the events and apply them
     let mut store = Store::default();
     for (index, result) in csv_reader.deserialize().into_iter().enumerate() {
-        let row: InputRow = result?;
+        let row: InputRow = match result {
+            Ok(row) => row,
+            Err(error) => {
+                match error.kind() {
+                    // Otherwise
+                    ::csv::ErrorKind::Deserialize { err: error, .. } => {
+                        warn!("Failed deserializing action {index}: {error}");
+                        continue;
+                    }
+                    _ => return Err(error.into()),
+                }
+            }
+        };
         let action: Action = match row.try_into() {
             Ok(action) => action,
             Err(error) => {

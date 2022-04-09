@@ -2,6 +2,8 @@
 
 A simple payments engine, to accrue transactions into final account totals.
 
+## Usage
+
 ## A brief word on terminology
 
 As described in the challenge, the terminology conflates `transaction` (in the sense of an initial deposit/withdrawal),
@@ -103,6 +105,22 @@ Alternative thoughts if we can't fit everything in memory:
 - use something like RocksDB for a very simple, fast database-in-a-file
   - see also Redis etc. though that will be significantly slower
 
+### Scaling
+
+Already mentioned in the data sizes section, for scaling I'd move to a horizontally sharded model.
+
+If running as a microservice, I'd have:
+
+- Pool of `read` workers, to accept an incoming CSV, deserialise, shard actions by `tx` and forward to:
+- Pool of `ledger` workers to handle collating actions related to a range of `tx`s
+- Small pool of `write` workers to handle returning the current state across many `ledger` workers
+  - This would actually be kind of interesting in terms of consistency
+
+### Other grab bag of notes
+
+- Input data format is pretty inefficient (at the very least, `type` should be an enum of 0-4)
+- Client id is pretty small? Only u16?
+
 ## Assumptions
 
 Big list of assumptions I made:
@@ -124,21 +142,6 @@ Big list of assumptions I made:
   - I chose to back the underlying store with an `IndexMap`, rather than sorting a lot of data at output time.
     In practice these rows would be in a database, and you'd just have an index on the id.
 - Transfers can be infinitely disputed, as long as they are resolved each time.
-
-## Scaling
-
-Already mentioned in the data sizes section, for scaling I'd move to a horizontally sharded model.
-
-If running as a microservice, I'd have:
-
-- Pool of `read` workers, to accept an incoming CSV, deserialise, shard actions by `tx` and forward to:
-- Pool of `ledger` workers to handle collating actions related to a range of `tx`s
-- Small pool of `write` workers to handle returning the current state across many `ledger` workers
-  - This would actually be kind of interesting in terms of consistency
-
-## Other grab bag of notes
-
-- Input data format is pretty inefficient (at the very least, `type` should be an enum of 0-4)
 
 ## Time taken
 
