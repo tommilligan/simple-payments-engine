@@ -111,9 +111,9 @@ pub struct Store {
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("not found: {transfer_id:?}")]
-    NotFound { transfer_id: TransferId },
+    TransferNotFound { transfer_id: TransferId },
     #[error("conflict: {transfer_id:?}, {kind}: {description}")]
-    Conflict {
+    TransferConflict {
         transfer_id: TransferId,
         kind: &'static str,
         description: String,
@@ -155,7 +155,7 @@ impl Store {
                 use std::collections::hash_map::Entry;
                 match self.transfer.entry(transfer_id) {
                     Entry::Occupied(_) => {
-                        return Err(Error::Conflict {
+                        return Err(Error::TransferConflict {
                             transfer_id,
                             kind: "transfer exists",
                             description: "a transfer already exists with this id".to_owned(),
@@ -173,14 +173,15 @@ impl Store {
                 client.total += payload.value
             }
             action::ActionKind::Dispute => {
+                let client = self.client.entry(client_id).or_default();
                 let transfer = self
                     .transfer
                     .get_mut(&transfer_id)
-                    .ok_or_else(|| Error::NotFound { transfer_id })?;
+                    .ok_or_else(|| Error::TransferNotFound { transfer_id })?;
                 match transfer.status {
                     transfer::Status::Transferred => transfer.status = transfer::Status::Disputed,
                     _ => {
-                        return Err(Error::Conflict {
+                        return Err(Error::TransferConflict {
                             transfer_id,
                             kind: "disputed non-transferred transfer",
                             description: format!(
@@ -190,16 +191,22 @@ impl Store {
                         })
                     }
                 }
+
+                // Here we assume that the client has sufficient funds to hold.
+                //
+                // This is by construction (assuming no chargebacks have occurred).
+                client.held += transfer.value
             }
-            action::ActionKind::Close(_) => {
+            action::ActionKind::Close(payload) => {
+                let client = self.client.entry(client_id).or_default();
                 let transfer = self
                     .transfer
                     .get_mut(&transfer_id)
-                    .ok_or_else(|| Error::NotFound { transfer_id })?;
+                    .ok_or_else(|| Error::TransferNotFound { transfer_id })?;
                 match transfer.status {
                     transfer::Status::Disputed => transfer.status = transfer::Status::Closed,
                     _ => {
-                        return Err(Error::Conflict {
+                        return Err(Error::TransferConflict {
                             transfer_id,
                             kind: "closed non-disputed transfer",
                             description: format!(
@@ -207,6 +214,14 @@ impl Store {
                                 transfer.status
                             ),
                         })
+                    }
+                };
+                match payload.action {
+                    action::CloseAction::Resolve => client.held -= transfer.value,
+                    action::CloseAction::Chargeback => {
+                        client.access = client::Access::Frozen;
+                        client.held -= transfer.value;
+                        client.total -= transfer.value;
                     }
                 }
             }
