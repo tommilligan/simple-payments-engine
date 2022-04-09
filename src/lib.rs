@@ -4,7 +4,7 @@ pub mod types;
 
 use crate::{
     csv::{InputRow, OutputRow},
-    store::{client::Access, Store},
+    store::Store,
     types::action::Action,
 };
 use log::warn;
@@ -44,7 +44,7 @@ pub fn run<R: std::io::Read, W: std::io::Write>(reader: R, writer: &mut W) -> Re
             available: client_state.available(),
             held: client_state.held,
             total: client_state.total,
-            locked: client_state.access == Access::Frozen,
+            locked: client_state.is_locked(),
         })?;
     }
     Ok(())
@@ -54,6 +54,13 @@ pub fn run<R: std::io::Read, W: std::io::Write>(reader: R, writer: &mut W) -> Re
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+
+    fn assert_run_produces(input: &str, expected: &str) {
+        let mut actual = Vec::new();
+        run(input.as_bytes(), &mut actual).unwrap();
+        let actual = String::from_utf8(actual).unwrap();
+        assert_eq!(actual, expected);
+    }
 
     #[test]
     fn spec_example() {
@@ -68,9 +75,134 @@ withdrawal,2,5,3.0
 1,1.5,0.0,1.5,false
 2,2.0,0.0,2.0,false
 ";
-        let mut actual = Vec::new();
-        run(input.as_bytes(), &mut actual).unwrap();
-        let actual = String::from_utf8(actual).unwrap();
-        assert_eq!(actual, expected);
+        assert_run_produces(input, expected);
+    }
+
+    #[test]
+    fn duplicate_deposit() {
+        let input = "type,client,tx,amount
+deposit,1,1,1.0
+deposit,1,1,1.0
+";
+        let expected = "client,available,held,total,locked
+1,1.0,0.0,1.0,false
+";
+        assert_run_produces(input, expected);
+    }
+
+    #[test]
+    fn duplicate_withdrawal() {
+        let input = "type,client,tx,amount
+deposit,1,2,10.0
+withdrawal,1,1,1.0
+withdrawal,1,1,1.0
+";
+        let expected = "client,available,held,total,locked
+1,9.0,0.0,9.0,false
+";
+        assert_run_produces(input, expected);
+    }
+
+    #[test]
+    fn duplicate_dispute() {
+        let input = "type,client,tx,amount
+deposit,1,1,1.0
+deposit,1,2,2.0
+dispute,1,2,
+dispute,1,2,
+";
+        let expected = "client,available,held,total,locked
+1,1.0,2.0,3.0,false
+";
+        assert_run_produces(input, expected);
+    }
+
+    #[test]
+    fn duplicate_resolve() {
+        let input = "type,client,tx,amount
+deposit,1,1,1.0
+deposit,1,2,2.0
+dispute,1,2,
+resolve,1,2,
+resolve,1,2,
+";
+        let expected = "client,available,held,total,locked
+1,3.0,0.0,3.0,false
+";
+        assert_run_produces(input, expected);
+    }
+
+    #[test]
+    fn duplicate_chargeback() {
+        let input = "type,client,tx,amount
+deposit,1,1,1.0
+deposit,1,2,2.0
+dispute,1,2,
+chargeback,1,2,
+chargeback,1,2,
+";
+        let expected = "client,available,held,total,locked
+1,1.0,0.0,1.0,true
+";
+        assert_run_produces(input, expected);
+    }
+
+    #[test]
+    fn chargeback_negative() {
+        let input = "type,client,tx,amount
+deposit,1,2,2.0
+withdrawal,1,3,1.0
+dispute,1,2,
+chargeback,1,2,
+";
+        let expected = "client,available,held,total,locked
+1,-1.0,0.0,-1.0,true
+";
+        assert_run_produces(input, expected);
+    }
+
+    #[test]
+    fn chargeback_freezes() {
+        let input = "type,client,tx,amount
+deposit,1,1,5.0
+deposit,1,2,2.0
+dispute,1,2,
+chargeback,1,2,
+withdrawal,1,3,3.0
+";
+        let expected = "client,available,held,total,locked
+1,5.0,0.0,5.0,true
+";
+        assert_run_produces(input, expected);
+    }
+
+    #[test]
+    fn dispute_after_resolve() {
+        let input = "type,client,tx,amount
+deposit,1,1,1.0
+deposit,1,2,2.0
+dispute,1,2,
+resolve,1,2,
+dispute,1,2,
+";
+        let expected = "client,available,held,total,locked
+1,1.0,2.0,3.0,false
+";
+        assert_run_produces(input, expected);
+    }
+
+    #[test]
+    fn dispute_after_chargeback() {
+        let input = "type,client,tx,amount
+deposit,1,1,1.0
+deposit,1,2,2.0
+dispute,1,2,
+chargeback,1,2,
+dispute,1,2,
+";
+        let expected = "client,available,held,total,locked
+1,1.0,0.0,1.0,true
+";
+        assert_run_produces(input, expected);
     }
 }

@@ -23,13 +23,17 @@ impl Store {
             transfer_id,
             kind,
         } = action;
+
+        // Ensure the client has sufficient funds (initialising if not found).
+        // It's okay the client gets stored with a default state, even if the
+        // transfer fails.
+        let client = self.client.entry(client_id).or_default();
+        if client.is_locked() {
+            return Err(Error::ClientLocked { client_id });
+        }
+
         match kind {
             action::ActionKind::Transfer(payload) => {
-                // Ensure the client has sufficient funds (initialising if not found).
-                // It's okay the client gets stored with a default state, even if the
-                // transfer fails.
-                let client = self.client.entry(client_id).or_default();
-
                 // If this is a withdrawal, ensure the client has enough funds.
                 //
                 // A client should never have negative available funds without
@@ -64,7 +68,6 @@ impl Store {
                 client.total += payload.value
             }
             action::ActionKind::Dispute => {
-                let client = self.client.entry(client_id).or_default();
                 let transfer = self
                     .transfer
                     .get_mut(&transfer_id)
@@ -88,29 +91,29 @@ impl Store {
                 // This is by construction (assuming no chargebacks have occurred).
                 client.held += transfer.value
             }
-            action::ActionKind::Close(payload) => {
-                let client = self.client.entry(client_id).or_default();
+            action::ActionKind::Settle(payload) => {
                 let transfer = self
                     .transfer
                     .get_mut(&transfer_id)
                     .ok_or_else(|| Error::TransferNotFound { transfer_id })?;
-                match transfer.status {
-                    transfer::Status::Disputed => transfer.status = transfer::Status::Closed,
-                    _ => {
-                        return Err(Error::TransferConflict {
-                            transfer_id,
-                            kind: "closed non-disputed transfer",
-                            description: format!(
-                                "transfer should be disputed, found: {:?}",
-                                transfer.status
-                            ),
-                        })
-                    }
+                if transfer.status != transfer::Status::Disputed {
+                    return Err(Error::TransferConflict {
+                        transfer_id,
+                        kind: "settled non-disputed transfer",
+                        description: format!(
+                            "transfer should be disputed, found: {:?}",
+                            transfer.status
+                        ),
+                    });
                 };
                 match payload.action {
-                    action::CloseAction::Resolve => client.held -= transfer.value,
-                    action::CloseAction::Chargeback => {
-                        client.access = client::Access::Frozen;
+                    action::SettleAction::Resolve => {
+                        transfer.status = transfer::Status::Transferred;
+                        client.held -= transfer.value;
+                    }
+                    action::SettleAction::Chargeback => {
+                        transfer.status = transfer::Status::Chargebacked;
+                        client.access = client::Access::Locked;
                         client.held -= transfer.value;
                         client.total -= transfer.value;
                     }

@@ -16,4 +16,6 @@ pub enum Error {
         client_id: ClientId,
         kind: &'static str,
     },
+    #[error("client is locked: {client_id:?}")]
+    ClientLocked { client_id: ClientId },
 }

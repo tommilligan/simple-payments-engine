@@ -12,7 +12,7 @@ pub mod action {
     pub enum ActionKind {
         Transfer(Transfer),
         Dispute,
-        Close(Close),
+        Settle(Settle),
     }
 
     #[derive(Debug, Clone, PartialEq)]
@@ -21,12 +21,12 @@ pub mod action {
     }
 
     #[derive(Debug, Clone, PartialEq)]
-    pub struct Close {
-        pub action: CloseAction,
+    pub struct Settle {
+        pub action: SettleAction,
     }
 
     #[derive(Debug, Clone, PartialEq)]
-    pub enum CloseAction {
+    pub enum SettleAction {
         Resolve,
         Chargeback,
     }

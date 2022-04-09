@@ -29,19 +29,19 @@ For my own sanity, and to avoid confustion, the terms used in this implementatio
 As described, the actions make up the following state machine:
 
 ```txt
-                          dispute            resolve
-            ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-            │              │   │              ├───► Resolved     │
- deposit ───► Transferred  ├───► Disputed     │   ┌──────────────┤
- withdrawal │              │   │              ├───► Chargebacked │
-            └──────────────┘   └──────────────┘   └──────────────┘
-                                             chargeback
+                         dispute            chargeback
+           ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+           │              ├───►              │   │              │
+deposit ───► Transferred  │   │ Disputed     ├───► Chargebacked │
+withdrawal │              ◄───┤              │   │              │
+           └──────────────┘   └──────────────┘   └──────────────┘
+                         resolve
 ```
 
 Some optimisations fall out of this:
 
 - We don't care about a deposit vs. a withdrawal for anything except the value sign. So let's just store it as the sign in a f64.
-- Once a transfer reaches the state of `Resolved` or `Chargebacked`, it is effectively dead.
+- Once a transfer reaches the state of `Chargebacked`, it is effectively dead.
   - There are no further actions we can take on it.
   - We only need to retain it, if we are to ignore duplicate transaction ids in the input/handle retries.
     - This could be a potential optimisation in future - can drop all state information, and just filter out the given ids from the input
@@ -115,6 +115,7 @@ Big list of assumptions I made:
 - Assumed that we desire consistency in the results - i.e. they should be sorted.
   - I chose to back the underlying store with an `IndexMap`, rather than sorting a lot of data at output time.
     In practice these rows would be in a database, and you'd just have an index on the id.
+- Transfers can be infinitely disputed, as long as they are resolved each time.
 
 ## Scaling
 

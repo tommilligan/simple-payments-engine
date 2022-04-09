@@ -5,7 +5,7 @@ use crate::types::ClientId;
 #[repr(u8)]
 pub enum Access {
     Active,
-    Frozen,
+    Locked,
 }
 
 impl Default for Access {
@@ -24,6 +24,10 @@ pub struct State {
 impl State {
     pub fn available(&self) -> f64 {
         self.total - self.held
+    }
+
+    pub fn is_locked(&self) -> bool {
+        self.access == Access::Locked
     }
 }
 

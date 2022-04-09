@@ -1,13 +1,12 @@
 use crate::types::TransferId;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 // Make sure this is small, we need to store one per transfer.
 #[repr(u8)]
 pub enum Status {
     Transferred,
     Disputed,
-    // either resolved or chargebacked
-    Closed,
+    Chargebacked,
 }
 
 #[derive(Debug, Clone)]

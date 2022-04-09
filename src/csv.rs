@@ -44,11 +44,11 @@ impl TryFrom<InputRow> for action::Action {
                 action::ActionKind::Transfer(action::Transfer { value })
             }
             "dispute" => action::ActionKind::Dispute,
-            "resolve" => action::ActionKind::Close(action::Close {
-                action: action::CloseAction::Resolve,
+            "resolve" => action::ActionKind::Settle(action::Settle {
+                action: action::SettleAction::Resolve,
             }),
-            "chargeback" => action::ActionKind::Close(action::Close {
-                action: action::CloseAction::Chargeback,
+            "chargeback" => action::ActionKind::Settle(action::Settle {
+                action: action::SettleAction::Chargeback,
             }),
             _ => return Err(Error::BadActionKind { kind }),
         };
