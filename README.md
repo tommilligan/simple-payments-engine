@@ -4,6 +4,18 @@ A simple payments engine, to accrue transactions into final account totals.
 
 ## Usage
 
+To run:
+
+```bash
+cargo run -- actions.csv > output.csv
+```
+
+To test:
+
+```bash
+./check
+```
+
 ## A brief word on terminology
 
 As described in the challenge, the terminology conflates `transaction` (in the sense of an initial deposit/withdrawal),

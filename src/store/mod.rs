@@ -71,7 +71,7 @@ impl Store {
                 let transfer = self
                     .transfer
                     .get_mut(&transfer_id)
-                    .ok_or_else(|| Error::TransferNotFound { transfer_id })?;
+                    .ok_or(Error::TransferNotFound { transfer_id })?;
                 match transfer.status {
                     transfer::Status::Transferred => transfer.status = transfer::Status::Disputed,
                     _ => {
@@ -95,7 +95,7 @@ impl Store {
                 let transfer = self
                     .transfer
                     .get_mut(&transfer_id)
-                    .ok_or_else(|| Error::TransferNotFound { transfer_id })?;
+                    .ok_or(Error::TransferNotFound { transfer_id })?;
                 if transfer.status != transfer::Status::Disputed {
                     return Err(Error::TransferConflict {
                         transfer_id,
