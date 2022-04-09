@@ -1,0 +1,132 @@
+# simple-payments-engine
+
+A simple payments engine, to accrue transactions into final account totals.
+
+## Initial Thoughs
+
+Before beginning implementation, I have the following thoughts/assumptions:
+
+- We need to maintain state for:
+  - Each transaction: value, status (is disputed)
+  - Each client: funds available, funds held, is account frozen
+- For large volumes, we will be constrained by the amount of data we can fit in memory. Therefore, this should be optimised as much as possible.
+
+## Terminology
+
+As described, the terminology conflates `transaction` (in the sense of an initial deposit/withdrawal),
+and follow up actions such as a dispute, that reference that initial action.
+
+For example, a `dispute` is described as a `transaction`, but does not have a unique transaction id.
+
+For my own sanity, and to avoid confustion, the terms used in this implementation are:
+
+- `action`: an entry from the input CSV describing one of: deposit/withdrawal/dispute/resolve/chargeback
+  - `transfer`: an initial change of funds; one of: deposit/withdrawal
+  - `update`: a state change pointing at an existing `transfer`; one of: dispute/resolve/chargeback
+
+## Model
+
+As described, the actions make up the following state machine:
+
+```txt
+                          dispute            resolve
+            ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+            │              │   │              ├───► Resolved     │
+ deposit ───► Transferred  ├───► Disputed     │   ┌──────────────┤
+ withdrawal │              │   │              ├───► Chargebacked │
+            └──────────────┘   └──────────────┘   └──────────────┘
+                                             chargeback
+```
+
+Some optimisations fall out of this:
+
+- We don't care about a deposit vs. a withdrawal for anything except the value sign. So let's just store it as the sign in a f64.
+- Once a transfer reaches the state of `Resolved` or `Chargebacked`, it is effectively dead.
+  - There are no further actions we can take on it.
+  - We only need to retain it, if we are to ignore duplicate transaction ids in the input/handle retries.
+    - This could be a potential optimisation in future - can drop all state information, and just filter out the given ids from the input
+
+## Precision
+
+I used f64 everywhere to ensure the precision was reasonable. See [this blog post](https://blog.demofox.org/2017/11/21/floating-point-precision/) for a pretty nice overview.
+
+f32 will only provide four decimal precision up to around 2^10 or ±1E3. f64 will provide four decimal precision up to around 2^39 or ±5E11. This corresponds to tens of trillions as a max value.
+
+## Data sizes
+
+As mentioned in the brief, `tx` is a u32. As we need to hold state for all transactions, that will be our resource limit.
+
+If we were sure we would use all transaction ids, the most efficient memory model would be store a `Vec` where the index is the `tx`. This gives us a max size of about **36 GiB**, which would be doable even on my 64GB laptop:
+
+```python
+value = 8 # f64 is 8 bytes
+state = 1 # enum stored as u8, single byte (can enforce with `#[repr(u8)]`
+per_tx = value + state
+num_tx = 2 ** 32
+total = per_tx * num_tx
+total_gi = total / 1024**3
+```
+
+This is probably not a reasonable scenario. Let's say we use a large amount of data, such that `tx`
+can be randomly generated without having collisions. The upper bound for this is something like
+[sqrt-n](https://www.johndcook.com/blog/2017/01/10/probability-of-secure-hash-collisions) values, so
+for a u32, let's say 2^16 values.
+
+This gives us **0.8 MiB**:
+
+```python
+key = 4 # u32 is 4 bytes
+value = 8 # f64 is 8 bytes
+state = 1 # enum stored as u8, single byte (can enforce with `#[repr(u8)]`
+per_tx = key + value + state
+num_tx = 2 ** 16
+total = per_tx * num_tx
+total_mi = total / 1024**2
+```
+
+Even assuming the overhead of a HashMap to store the relevant information in, that's still very tiny.
+
+So we should be good to just store everything in memory!
+
+Alternative thoughts if we can't fit everything in memory:
+
+- run in memory, but sharded (horizontally by `tx`, for instance split into 16 shards where each cares about `tx`s with `tx % 16 = <my_shard_id>`)
+- back a large buffer with disk using something like `memmap`
+- use something like RocksDB for a very simple, fast database-in-a-file
+  - see also Redis etc. though that will be significantly slower
+
+## Assumptions
+
+Big list of assumptions I made:
+
+- The purpose of the `client` field on the dispute/resolve/chargeback actions was not stated.
+  I have assumed that it references the same client, as the base transfer the action points at with `tx`.
+  This saves having to store the `client` for each `tx` in memory. If it instead describes the client requesting the action,
+  this implementation is completely incorrect.
+- No error API was described for the program to implement.
+  In an unrecoverable error state, the program will exit with code `1`.
+  Logs including error messages will be printed to `stderr`.
+- Invalid actions should be silently dropped from the input. This includes cases such as:
+  - unknown action type
+  - invalid value for field type
+- There were no negative `amount` values in the data. I assumed that such a action is invalid (a negative withdrawal should be a deposit, and vv).
+  - Amounts will be in the range `0 <= amount <= 1E11` (see precision above).
+
+## Scaling
+
+Already mentioned in the data sizes section, for scaling I'd move to a horizontally sharded model.
+
+If running as a microservice, I'd have:
+
+- Pool of `read` workers, to accept an incoming CSV, deserialise, shard actions by `tx` and forward to:
+- Pool of `ledger` workers to handle collating actions related to a range of `tx`s
+- Small pool of `write` workers to handle returning the current state across many `ledger` workers
+  - This would actually be kind of interesting in terms of consistency
+
+## Other grab bag of notes
+
+- Input data format is pretty inefficient (at the very least, `type` should be an enum of 0-4)
+
+## Time taken
+
+- 1:10:00 for writeup/design ahead of beginning implementation
