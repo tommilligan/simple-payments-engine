@@ -205,4 +205,15 @@ dispute,1,2,
 ";
         assert_run_produces(input, expected);
     }
+
+    #[test]
+    fn client_with_no_successful_actions_in_output() {
+        let input = "type,client,tx,amount
+withdrawal,1,1,4.0
+";
+        let expected = "client,available,held,total,locked
+1,0.0,0.0,0.0,false
+";
+        assert_run_produces(input, expected);
+    }
 }
