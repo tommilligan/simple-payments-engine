@@ -63,8 +63,8 @@ impl TryFrom<InputRow> for action::Action {
 #[derive(Debug, Serialize)]
 pub struct OutputRow {
     pub client: u16,
-    pub available: f64,
-    pub held: f64,
-    pub total: f64,
+    pub available: String,
+    pub held: String,
+    pub total: String,
     pub locked: bool,
 }

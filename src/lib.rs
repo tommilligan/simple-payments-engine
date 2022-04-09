@@ -55,9 +55,11 @@ pub fn run<R: std::io::Read, W: std::io::Write>(reader: R, writer: &mut W) -> Re
     for (client_id, client_state) in clients.into_iter() {
         csv_writer.serialize(OutputRow {
             client: client_id.0,
-            available: client_state.available(),
-            held: client_state.held,
-            total: client_state.total,
+            // These formats are annoying. If I had time I'd write a custom CSV serialiser,
+            // and not bother doing decimal points for integers.
+            available: format!("{:.4}", client_state.available()),
+            held: format!("{:.4}", client_state.held),
+            total: format!("{:.4}", client_state.total),
             locked: client_state.is_locked(),
         })?;
     }
@@ -86,8 +88,8 @@ withdrawal,1,4,1.5
 withdrawal,2,5,3.0
 ";
         let expected = "client,available,held,total,locked
-1,1.5,0.0,1.5,false
-2,2.0,0.0,2.0,false
+1,1.5000,0.0000,1.5000,false
+2,2.0000,0.0000,2.0000,false
 ";
         assert_run_produces(input, expected);
     }
@@ -99,7 +101,7 @@ deposit,1,1,1.0
 deposit,1,1,1.0
 ";
         let expected = "client,available,held,total,locked
-1,1.0,0.0,1.0,false
+1,1.0000,0.0000,1.0000,false
 ";
         assert_run_produces(input, expected);
     }
@@ -112,7 +114,7 @@ withdrawal,1,1,1.0
 withdrawal,1,1,1.0
 ";
         let expected = "client,available,held,total,locked
-1,9.0,0.0,9.0,false
+1,9.0000,0.0000,9.0000,false
 ";
         assert_run_produces(input, expected);
     }
@@ -126,7 +128,7 @@ dispute,1,2,
 dispute,1,2,
 ";
         let expected = "client,available,held,total,locked
-1,1.0,2.0,3.0,false
+1,1.0000,2.0000,3.0000,false
 ";
         assert_run_produces(input, expected);
     }
@@ -141,7 +143,7 @@ resolve,1,2,
 resolve,1,2,
 ";
         let expected = "client,available,held,total,locked
-1,3.0,0.0,3.0,false
+1,3.0000,0.0000,3.0000,false
 ";
         assert_run_produces(input, expected);
     }
@@ -156,7 +158,7 @@ chargeback,1,2,
 chargeback,1,2,
 ";
         let expected = "client,available,held,total,locked
-1,1.0,0.0,1.0,true
+1,1.0000,0.0000,1.0000,true
 ";
         assert_run_produces(input, expected);
     }
@@ -170,7 +172,7 @@ dispute,1,2,
 chargeback,1,2,
 ";
         let expected = "client,available,held,total,locked
-1,-1.0,0.0,-1.0,true
+1,-1.0000,0.0000,-1.0000,true
 ";
         assert_run_produces(input, expected);
     }
@@ -185,7 +187,7 @@ chargeback,1,2,
 withdrawal,1,3,3.0
 ";
         let expected = "client,available,held,total,locked
-1,5.0,0.0,5.0,true
+1,5.0000,0.0000,5.0000,true
 ";
         assert_run_produces(input, expected);
     }
@@ -200,7 +202,7 @@ resolve,1,2,
 dispute,1,2,
 ";
         let expected = "client,available,held,total,locked
-1,1.0,2.0,3.0,false
+1,1.0000,2.0000,3.0000,false
 ";
         assert_run_produces(input, expected);
     }
@@ -215,7 +217,7 @@ chargeback,1,2,
 dispute,1,2,
 ";
         let expected = "client,available,held,total,locked
-1,1.0,0.0,1.0,true
+1,1.0000,0.0000,1.0000,true
 ";
         assert_run_produces(input, expected);
     }
@@ -226,7 +228,7 @@ dispute,1,2,
 withdrawal,1,1,4.0
 ";
         let expected = "client,available,held,total,locked
-1,0.0,0.0,0.0,false
+1,0.0000,0.0000,0.0000,false
 ";
         assert_run_produces(input, expected);
     }
