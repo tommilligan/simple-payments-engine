@@ -232,4 +232,19 @@ withdrawal,1,1,4.0
 ";
         assert_run_produces(input, expected);
     }
+
+    #[test]
+    fn resolve_with_different_client() {
+        let input = "type,client,tx,amount
+deposit,1,1,1.0
+deposit,2,2,2.0
+dispute,2,2,
+resolve,1,2,
+";
+        let expected = "client,available,held,total,locked
+1,1.0000,0.0000,1.0000,false
+2,0.0000,2.0000,2.0000,false
+";
+        assert_run_produces(input, expected);
+    }
 }

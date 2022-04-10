@@ -78,12 +78,13 @@ f32 will only provide four decimal precision up to around 2^10 or ±1E3. f64 wil
 
 As mentioned in the brief, `tx` is a u32. As we need to hold state for all transactions, that will be our resource limit.
 
-If we were sure we would use all transaction ids, the most efficient memory model would be store a `Vec` where the index is the `tx`. This gives us a max size of about **36 GiB**, which would be doable even on my 64GB RAM laptop:
+If we were sure we would use all transaction ids, the most efficient memory model would be store a `Vec` where the index is the `tx`. This gives us a max size of about **44 GiB** (11 bytes per transfer), which would be just about doable on my 64GB RAM laptop:
 
 ```python
 value = 8 # f64 is 8 bytes
 state = 1 # enum stored as u8, single byte (can enforce with `#[repr(u8)]`
-per_tx = value + state
+client_id = 2 # u16 is 2 bytes
+per_tx = value + state + client_id
 num_tx = 2 ** 32
 total = per_tx * num_tx
 total_gi = total / 1024**3
@@ -94,16 +95,28 @@ can be randomly generated without having collisions. The upper bound for this is
 [sqrt-n](https://www.johndcook.com/blog/2017/01/10/probability-of-secure-hash-collisions) values, so
 for a u32, let's say 2^16 values.
 
-This gives us **0.8 MiB**:
+We also need to allow for storing:
+
+- the key
+- the overhead of the lookup structure (HashMap)
+  - [1 byte metadata per key](https://www.reddit.com/r/rust/comments/prirpw/memory_efficient_hashmap/hdkjpsc/)
+  - unused space in the container; this comment indicates [a factor of 11/10, then the next biggest power of 2](https://github.com/servo/servo/issues/6908#issuecomment-127729009).
+    We can make a simple worst case assumption of a factor of 2.
+
+This gives us **2 MiB** (32 bytes per transfer, inlucluding overhead):
 
 ```python
 key = 4 # u32 is 4 bytes
 value = 8 # f64 is 8 bytes
 state = 1 # enum stored as u8, single byte (can enforce with `#[repr(u8)]`
-per_tx = key + value + state
+client_id = 2 # u16 is 2 bytes
+collection_metadata = 1
+per_tx = key + value + state + client_id + collection_metadata
 num_tx = 2 ** 16
-total = per_tx * num_tx
+collection_overhead = 2
+total = (per_tx * num_tx) * collection_overhead
 total_mi = total / 1024**2
+total_per_tx = total / num_tx
 ```
 
 Even assuming the overhead of a HashMap to store the relevant information in, that's still very tiny.
@@ -139,8 +152,7 @@ Big list of assumptions I made:
 
 - The purpose of the `client` field on the dispute/resolve/chargeback actions was not stated.
   I have assumed that it references the same client, as the base transfer the action points at with `tx`.
-  This saves having to store the `client` for each `tx` in memory. If it instead describes the client requesting the action,
-  this implementation is completely incorrect.
+  If the client id does not match, the action is discarded.
 - No error API was described for the program to implement.
   In an unrecoverable error state, the program will exit with code `1`.
   Logs including error messages will be printed to `stderr`.

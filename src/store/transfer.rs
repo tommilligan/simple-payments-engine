@@ -1,4 +1,4 @@
-use crate::types::TransferId;
+use crate::types::{ClientId, TransferId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 // Make sure this is small, we need to store one per transfer.
@@ -16,6 +16,7 @@ pub enum Status {
 pub struct State {
     pub value: f64,
     pub status: Status,
+    pub client_id: ClientId,
 }
 
 pub type Store = std::collections::HashMap<TransferId, State>;
@@ -29,8 +30,9 @@ mod tests {
     fn size_of() {
         assert_eq!(std::mem::size_of::<Status>(), 1);
         assert_eq!(std::mem::size_of::<f64>(), 8);
+        assert_eq!(std::mem::size_of::<ClientId>(), 2);
         // verify we pack the state as small as possible
         // without custom packing, this would default to 16
-        assert_eq!(std::mem::size_of::<State>(), 9);
+        assert_eq!(std::mem::size_of::<State>(), 11);
     }
 }
