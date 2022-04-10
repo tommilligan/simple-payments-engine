@@ -41,7 +41,7 @@ impl TryFrom<InputRow> for action::Action {
                     return Err(Error::InvalidAmount { value });
                 }
                 let value = if &kind == "withdrawal" { -value } else { value };
-                action::ActionKind::Transfer(action::Transfer { value })
+                action::ActionKind::Transfer(action::Transfer { value, client_id })
             }
             "dispute" => action::ActionKind::Dispute,
             "resolve" => action::ActionKind::Settle(action::Settle {
@@ -52,11 +52,7 @@ impl TryFrom<InputRow> for action::Action {
             }),
             _ => return Err(Error::BadActionKind { kind }),
         };
-        Ok(Self {
-            client_id,
-            transfer_id,
-            kind,
-        })
+        Ok(Self { transfer_id, kind })
     }
 }
 

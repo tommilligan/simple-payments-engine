@@ -18,22 +18,17 @@ impl Store {
     }
 
     pub fn apply(&mut self, action: action::Action) -> Result<(), Error> {
-        let action::Action {
-            client_id,
-            transfer_id,
-            kind,
-        } = action;
-
-        // Ensure the client has sufficient funds (initialising if not found).
-        // It's okay the client gets stored with a default state, even if the
-        // transfer fails.
-        let client = self.client.entry(client_id).or_default();
-        if client.is_locked() {
-            return Err(Error::ClientLocked { client_id });
-        }
+        let action::Action { transfer_id, kind } = action;
 
         match kind {
             action::ActionKind::Transfer(payload) => {
+                let action::Transfer { value, client_id } = payload;
+
+                // Ensure the client has sufficient funds (initialising if not found).
+                // It's okay the client gets stored with a default state, even if the
+                // transfer fails.
+                let client = self.client.get_or_default_mut(client_id)?;
+
                 // If this is a withdrawal, ensure the client has enough funds.
                 //
                 // A client should never have negative available funds without
@@ -60,18 +55,20 @@ impl Store {
                         entry.insert(transfer::State {
                             value: payload.value,
                             status: transfer::Status::Transferred,
+                            client_id,
                         });
                     }
                 };
 
                 // And update the client.
-                client.total += payload.value
+                client.total += value
             }
             action::ActionKind::Dispute => {
                 let transfer = self
                     .transfer
                     .get_mut(&transfer_id)
                     .ok_or(Error::TransferNotFound { transfer_id })?;
+                let client = self.client.get_or_default_mut(transfer.client_id)?;
                 match transfer.status {
                     transfer::Status::Transferred => transfer.status = transfer::Status::Disputed,
                     _ => {
@@ -96,6 +93,7 @@ impl Store {
                     .transfer
                     .get_mut(&transfer_id)
                     .ok_or(Error::TransferNotFound { transfer_id })?;
+                let client = self.client.get_or_default_mut(transfer.client_id)?;
                 if transfer.status != transfer::Status::Disputed {
                     return Err(Error::TransferConflict {
                         transfer_id,

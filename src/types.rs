@@ -3,7 +3,6 @@ pub mod action {
 
     #[derive(Debug, Clone, PartialEq)]
     pub struct Action {
-        pub client_id: ClientId,
         pub transfer_id: TransferId,
         pub kind: ActionKind,
     }
@@ -17,6 +16,7 @@ pub mod action {
 
     #[derive(Debug, Clone, PartialEq)]
     pub struct Transfer {
+        pub client_id: ClientId,
         pub value: f64,
     }
 

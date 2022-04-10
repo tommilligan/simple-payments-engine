@@ -150,9 +150,8 @@ If running as a microservice, I'd have:
 
 Big list of assumptions I made:
 
-- The purpose of the `client` field on the dispute/resolve/chargeback actions was not stated.
-  I have assumed that it references the same client, as the base transfer the action points at with `tx`.
-  If the client id does not match, the action is discarded.
+- The purpose of the `client` field on the dispute/resolve/chargeback actions was not specified.
+  As it is not required (only `tx` is required to uniquely refernce a transfer), I have ignored it.
 - No error API was described for the program to implement.
   In an unrecoverable error state, the program will exit with code `1`.
   Logs including error messages will be printed to `stderr`.

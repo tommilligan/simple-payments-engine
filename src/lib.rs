@@ -51,7 +51,7 @@ pub fn run<R: std::io::Read, W: std::io::Write>(reader: R, writer: &mut W) -> Re
     }
 
     // Return output
-    let clients = store.into_client_store();
+    let clients = store.into_client_store().into_inner();
     for (client_id, client_state) in clients.into_iter() {
         csv_writer.serialize(OutputRow {
             client: client_id.0,
@@ -243,7 +243,7 @@ resolve,1,2,
 ";
         let expected = "client,available,held,total,locked
 1,1.0000,0.0000,1.0000,false
-2,0.0000,2.0000,2.0000,false
+2,2.0000,0.0000,2.0000,false
 ";
         assert_run_produces(input, expected);
     }

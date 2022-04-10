@@ -1,4 +1,7 @@
-use crate::types::{ClientId, TransferId};
+use crate::{
+    store::client,
+    types::{ClientId, TransferId},
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -16,6 +19,6 @@ pub enum Error {
         client_id: ClientId,
         kind: &'static str,
     },
-    #[error("client is locked: {client_id:?}")]
-    ClientLocked { client_id: ClientId },
+    #[error("client error: {0}")]
+    Client(#[from] client::Error),
 }
