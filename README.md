@@ -171,3 +171,4 @@ Big list of assumptions I made:
 - 1:10:00 for writeup/design ahead of beginning implementation
 - 2:30:00 for core implementation, such that the example input/ouput pair works
 - 1:00:00 for additional tidy up, test coverage, some bug fixes
+- 0:30:00 to change the design slightly to not trust the input data even more
